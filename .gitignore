@@ -1,0 +1,14 @@
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Node modules - in case you ever use npm
+node_modules/
+npm-debug.log
+
+# Build artifacts
+/dist
+/build

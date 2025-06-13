@@ -1,0 +1,16 @@
+{
+  "name": "llmcarbon-impact-service",
+  "version": "1.0.0",
+  "description": "API para calcular el impacto de LLM usando Impact Framework",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "js-yaml": "^4.1.0",
+    "body-parser": "^1.20.2",
+    "@dqbd/tiktoken": "^0.5.0",
+    "uuid": "^9.0.0"
+  }
+}

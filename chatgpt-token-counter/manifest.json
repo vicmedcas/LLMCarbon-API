@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "ChatGPT Token Extractor",
+  "description": "Extracts text from ChatGPT conversations and counts tokens using tiktoken.",
+  "version": "0.2.0",
+  "permissions": [
+    "scripting",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+  },
+  "action": {
+    "default_title": "ChatGPT Token Extractor",
+    "default_popup": "popup.html"
+  }
+}
