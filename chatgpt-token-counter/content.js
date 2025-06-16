@@ -8,11 +8,38 @@ console.log('ChatGPT Token Extractor: Content script loaded.');
  * Extracts the text content from all conversation messages on the page.
  */
 function extractMessages() {
-  // Selectors for ChatGPT message containers.
-  const messageNodes = document.querySelectorAll('[data-message-id] .markdown, [data-message-id] .text-base');
-  const messages = Array.from(messageNodes).map(node => node.innerText.trim());
-  console.log(`Extracted ${messages.length} messages.`);
-  return messages.filter(Boolean);
+    const messageElements = document.querySelectorAll('div[data-message-id]');
+    const messages = [];
+    let lastRole = null;
+
+    // This selector targets elements that are likely to contain message text or code.
+    const messageTextSelector = 'h1, h2, h3, h4, h5, h6, p, li, code, .whitespace-pre-wrap';
+
+    messageElements.forEach(elem => {
+        const role = elem.getAttribute('data-message-author-role');
+
+        // Use querySelectorAll to capture all parts of a message (e.g., text and code blocks).
+        const textElements = elem.querySelectorAll(messageTextSelector);
+        let text = '';
+        if (textElements.length > 0) {
+            text = Array.from(textElements).map(el => el.textContent).join('\n\n').trim();
+        } else {
+            // Fallback to the entire element text if no matches are found.
+            text = elem.textContent.trim();
+        }
+
+        if (text) {
+            // Merge consecutive messages from the same author.
+            if (role === lastRole && messages.length > 0) {
+                messages[messages.length - 1].text += '\n\n' + text;
+            } else {
+                messages.push({ role, text });
+                lastRole = role;
+            }
+        }
+    });
+
+    return messages.map(m => m.text);
 }
 
 /**

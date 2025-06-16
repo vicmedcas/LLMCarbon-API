@@ -1,28 +1,51 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT Token Extractor",
-  "description": "Extracts text from ChatGPT conversations and counts tokens using tiktoken.",
-  "version": "0.2.0",
+  "name": "Carbon Footprint Calculator for ChatGPT",
+  "version": "0.6.0",
+  "description": "Calculates tokens and CO2 emissions for ChatGPT conversations.",
   "permissions": [
     "scripting",
     "activeTab",
-    "tabs"
+    "tabs",
+    "sidePanel"
   ],
   "host_permissions": [
     "https://chatgpt.com/*"
   ],
+  "action": {
+    "default_title": "Carbon Footprint Calculator"
+  },
+
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "vendor/tiktoken.js",
+        "vendor/tiktoken_bg.wasm",
+        "vendor/tiktoken_bg.js",
+        "vendor/cl100k_base.json"
+      ],
+      "matches": [ "https://chatgpt.com/*" ]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
-  },
-  "action": {
-    "default_title": "ChatGPT Token Extractor",
-    "default_popup": "popup.html"
   }
 }
+
