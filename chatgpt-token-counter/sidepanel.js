@@ -49,12 +49,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function populateRegions() {
     if (!window.regionData) return;
+    // Remove previously injected options (marked with data-region) to avoid duplicates
+    regionSelect.querySelectorAll('option[data-region]').forEach(opt => opt.remove());
+
     window.regionData.forEach(r => {
       const opt = document.createElement('option');
       opt.value = r.region;
       opt.textContent = `${r.location} (${r.region}) — ${r.intensity} gCO₂/kWh`;
       opt.dataset.pue       = r.pue;
       opt.dataset.intensity = r.intensity;
+      opt.dataset.region    = '1'; // flag as dynamic
       regionSelect.appendChild(opt);
     });
   }
