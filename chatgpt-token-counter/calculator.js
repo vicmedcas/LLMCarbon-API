@@ -9,8 +9,12 @@ export class LLMEmissionsCalculator {
     this.defaults = {
       // These are hardcoded for now, but could be made configurable
       'hardware-efficiency': 0.35, // Average hardware efficiency
-      'gpu/flop_peak': 1.246e14, // A100 PCIe 80GB Peak FP16/BF16 TFLOPS
-      'gpu/tdp': 400, // A100 PCIe 80GB TDP in Watts
+      'gpu_flop_peak': 1.246e14, // A100 PCIe 80GB Peak FP16/BF16 TFLOPS
+      'gpu_tdp': 400, // A100 PCIe 80GB TDP in Watts
+      'expected-lifespan': 5, // years
+      'days-per-year': 365,
+      'hours-per-day': 24,
+      'seconds-per-hour': 3600,
     };
     this.updateSettings(settings);
   }
@@ -24,33 +28,41 @@ export class LLMEmissionsCalculator {
   }
 
   /**
-   * Calculates the total inference cost in grams of CO2 equivalent.
-   * This is a simplified model for demonstration.
-   *
-   * @param {number} totalTokens - The total number of tokens in the conversation.
-   * @returns {number} The calculated CO2 emissions in grams.
+   * Calculates both operational and embodied CO2 emissions.
+   * @param {number} totalTokens - The total number of tokens for the operation.
+   * @returns {object} An object containing operational, embodied, and total emissions in grams.
    */
-  calculateInferenceCost(totalTokens) {
-    // Convert model parameters from billions to actual number
+  calculateEmissions(totalTokens) {
+    // --- Operational Carbon Calculation ---
     const modelParams = this.params['param-count'] * 1e9;
-    
-    // Simplified calculation: Total FLOPs for inference (2 * params * tokens)
     const totalFlops = 2 * modelParams * totalTokens;
-
-    // Time to compute (Total FLOPs / FLOPs per second)
-    const flopsPerSecond = this.params['gpu/flop_peak'] * this.params['hardware-efficiency'];
+    const flopsPerSecond = this.params['gpu_flop_peak'] * this.params['hardware-efficiency'];
     const computeTimeSeconds = totalFlops / flopsPerSecond;
-
-    // Energy consumed (Time * Power)
-    const powerWatts = this.params['gpu/tdp'];
+    const powerWatts = this.params['gpu_tdp'];
     const energyJoules = computeTimeSeconds * powerWatts;
     const energyKWh = energyJoules / (3.6e6); // Convert Joules to kWh
+    const operational = energyKWh * this.params['carbon-intensity'] * this.params['pue'];
 
-    // CO2 Emissions (Energy * Carbon Intensity * PUE)
-    const carbonIntensity = this.params['carbon-intensity']; // gCO2e/kWh
-    const pue = this.params['pue'];
-    const co2Grams = energyKWh * carbonIntensity * pue;
+    // --- Embodied Carbon Calculation ---
+    const estimateOperationHour = computeTimeSeconds / this.defaults['seconds-per-hour'];
+    const expectedLifespanDuration = this.defaults['expected-lifespan'] * this.defaults['days-per-year'] * this.defaults['hours-per-day'];
+    const expectedLifespanRate = expectedLifespanDuration > 0 ? estimateOperationHour / expectedLifespanDuration : 0;
 
-    return co2Grams;
+    const calculateEmbodied = (cap, area, numUnits) => {
+      return numUnits * cap * area * expectedLifespanRate;
+    };
+
+    const gpuEmbodied = calculateEmbodied(this.params['gpu_cap'], this.params['gpu_area'], this.params['gpu_num']);
+    const cpuEmbodied = calculateEmbodied(this.params['cpu_cap'], this.params['cpu_area'], this.params['hardware-unit-num']);
+    const ssdEmbodied = calculateEmbodied(this.params['ssd_cap'], this.params['ssd_area'], this.params['hardware-unit-num']);
+    const dramEmbodied = calculateEmbodied(this.params['dram_cap'], this.params['dram_area'], this.params['hardware-unit-num']);
+
+    const embodied = gpuEmbodied + cpuEmbodied + ssdEmbodied + dramEmbodied;
+
+    return {
+      operational: operational || 0,
+      embodied: embodied || 0,
+      total: (operational || 0) + (embodied || 0),
+    };
   }
 }

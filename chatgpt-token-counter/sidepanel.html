@@ -2,81 +2,91 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>ChatGPT Token Counter</title>
+  <title>ChatGPT Carbon Calculator</title>
   <link rel="stylesheet" href="sidepanel.css">
 </head>
 <body>
+
   <div class="header">
-    <h1>Token Count / Cost Contribution</h1>
+    <h1>Carbon Footprint</h1>
     <button id="refresh">Refresh</button>
   </div>
 
-  <div id="counts-container">
-    <ul id="counts">
-      <!-- Token counts will be inserted here -->
-    </ul>
+  <p id="status">Initializing...</p>
+
+  <!-- Main Results Display -->
+  <div class="results-container">
+    <div class="emission-total">
+      <h2 id="co2-linear" style="color:#a3e635;font-weight:bold;"></h2>
+      <h2 id="co2-quadratic" style="color:#eab308;font-weight:bold;"></h2>
+    </div>
+    <div class="emission-breakdown">
+      <p id="co2-operational"></p>
+      <p id="co2-embodied"></p>
+    </div>
+    <p id="impact-note" class="impact-note"></p>
+    <div id="co2-comparison"></div>
   </div>
 
-  <details class="settings-container">
-    <summary>Advanced Settings</summary>
+  <!-- Configuration Section -->
+  <details classs="settings-container">
+    <summary>Configuration</summary>
     <form id="settings-form" class="settings-form">
+      <div class="form-group">
+        <label for="impact-select">Complexity Model:</label>
+        <select id="impact-select" class="styled-select">
+          <option value="linear" selected>Linear (Optimistic)</option>
+          <option value="quadratic">Quadratic (Conservative)</option>
+        </select>
+      </div>
       <div class="form-group">
         <label for="param-count">Model Parameters (Billions)</label>
         <input type="number" id="param-count" value="175" step="1">
       </div>
       <div class="form-group">
-        <label for="carbon-intensity">Carbon Intensity (gCO2e/kWh)</label>
-        <input type="number" id="carbon-intensity" value="450" step="1">
-      </div>
-       <div class="form-group">
-        <label for="pue">PUE</label>
-        <input type="number" id="pue" value="1.1" step="0.01">
-      </div>
-      <div class="form-group">
-        <label for="system-instructions">System Instructions (Tokens)</label>
-        <input type="number" id="system-instructions" value="0" step="1">
-      </div>
-      <div class="form-group">
-        <label for="region">Region</label>
-        <select id="region">
-          <option value="">World Average</option>
+        <label for="region">Region:</label>
+        <select id="region" class="styled-select">
+          <option value="custom">Custom</option>
           <!-- Regions will be populated from data.js -->
         </select>
       </div>
+      <div class="form-group">
+        <label for="carbon-intensity">Carbon Intensity (gCO2e/kWh):</label>
+        <input type="number" id="carbon-intensity" value="450" step="1">
+      </div>
+       <div class="form-group">
+        <label for="pue">PUE:</label>
+        <input type="number" id="pue" value="1.1" step="0.01">
+      </div>
+      <div class="form-group">
+        <label for="hardware-select">Hardware:</label>
+        <select id="hardware-select" class="styled-select">
+          <!-- Options will be populated from hardware-data.js -->
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="gpu-count">GPU Count:</label>
+        <input type="number" id="gpu-count" value="16" min="1">
+      </div>
+      <div class="form-group">
+        <label for="hardware-efficiency">HW Efficiency:</label>
+        <input type="number" id="hardware-efficiency" value="0.35" step="0.01" min="0" max="1">
+      </div>
     </form>
   </details>
 
+  <!-- Per-Prompt Breakdown Section -->
   <details class="settings-container">
-    <summary>Multimedia</summary>
-    <form id="multimedia-form" class="settings-form">
-        <div class="form-group">
-            <label for="image-count-input">Number of Images</label>
-            <input type="number" id="image-count-input" value="0" min="0" step="1">
-        </div>
-        <div class="form-group">
-            <label for="file-size-input">Total File Size (KB)</label>
-            <input type="number" id="file-size-input" value="0" min="0" step="1">
-        </div>
-    </form>
+    <summary>Per-Prompt Breakdown</summary>
+    <div id="counts-container">
+      <ul id="counts">
+        <!-- Token counts will be inserted here -->
+      </ul>
+    </div>
   </details>
-
-  <div class="footer">
-    <p id="status">Initializing...</p>
-    <label style="display:flex;align-items:center;justify-content:center;margin-top:4px;font-size:13px;gap:8px;">
-      Conversation Length Complexity:
-      <select id="impact-select" style="background:#202123;color:#fff;border:1px solid #565869;border-radius:4px;padding:2px 4px;">
-        <option value="linear" selected>Linear</option>
-        <option value="quadratic">Quadratic</option>
-      </select>
-    </label>
-    <p id="co2-linear" style="color:#a3e635;font-weight:bold;"></p>
-    <p id="co2-quadratic"></p>
-
-    <div id="co2-comparison"></div>
-  </div>
-  <p id="impact-note" class="impact-note" style="text-align:center;margin:8px 0 0 0;"></p>
 
   <script src="data.js"></script>
+  <script src="hardware-data.js"></script>
   <script src="sidepanel.js" type="module"></script>
 </body>
 </html>

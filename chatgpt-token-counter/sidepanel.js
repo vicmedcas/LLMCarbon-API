@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const countsEl = document.getElementById('counts');
   const co2LinearEl    = document.getElementById('co2-linear');
   const co2QuadraticEl = document.getElementById('co2-quadratic');
+  const co2OperationalEl = document.getElementById('co2-operational');
+  const co2EmbodiedEl = document.getElementById('co2-embodied');
   const impactSelect   = document.getElementById('impact-select');
   const impactNoteEl   = document.getElementById('impact-note');
 
@@ -46,20 +48,29 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ---------- Region & PUE ---------- */
   const regionSelect = document.getElementById('region');
   const pueInput     = document.getElementById('pue');
+  const hardwareSelect = document.getElementById('hardware-select');
 
   function populateRegions() {
     if (!window.regionData) return;
-    // Remove previously injected options (marked with data-region) to avoid duplicates
     regionSelect.querySelectorAll('option[data-region]').forEach(opt => opt.remove());
-
     window.regionData.forEach(r => {
       const opt = document.createElement('option');
       opt.value = r.region;
       opt.textContent = `${r.location} (${r.region}) — ${r.intensity} gCO₂/kWh`;
-      opt.dataset.pue       = r.pue;
+      opt.dataset.pue = r.pue;
       opt.dataset.intensity = r.intensity;
-      opt.dataset.region    = '1'; // flag as dynamic
+      opt.dataset.region = '1';
       regionSelect.appendChild(opt);
+    });
+  }
+
+  function populateHardware() {
+    if (!window.hardwareData) return;
+    window.hardwareData.gpus.forEach(gpu => {
+      const opt = document.createElement('option');
+      opt.value = gpu.id;
+      opt.textContent = gpu.name;
+      hardwareSelect.appendChild(opt);
     });
   }
 
@@ -70,7 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  hardwareSelect.addEventListener('change', handleSettingsChange);
+
   populateRegions();
+  populateHardware();
 
   let currentSettings = {};
   const co2ComparisonEl = document.getElementById('co2-comparison');
@@ -117,8 +131,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const settings = getSettingsFromForm();
     calculator = new LLMEmissionsCalculator(settings);
     settingsForm.addEventListener('input', handleSettingsChange);
-    document.getElementById('multimedia-form').addEventListener('input', handleSettingsChange);
     regionSelect.addEventListener('change', handleRegionChange);
+    hardwareSelect.addEventListener('change', handleSettingsChange);
   }
 
   /**
@@ -129,10 +143,60 @@ document.addEventListener('DOMContentLoaded', () => {
       'param-count': parseFloat(document.getElementById('param-count').value),
       'carbon-intensity': parseFloat(carbonIntensityInput.value),
       'pue': parseFloat(document.getElementById('pue').value),
-      'system-instructions': parseInt(document.getElementById('system-instructions').value, 10),
-      'image-count': parseInt(document.getElementById('image-count-input').value, 10) || 0,
-      'file-size': parseInt(document.getElementById('file-size-input').value, 10) || 0,
+      'system-instructions': 0,
+      'image-count': 0,
+      'file-size': 0,
       'region': regionSelect.value,
+      'gpu_num': parseInt(document.getElementById('gpu-count').value, 10),
+      'hardware-efficiency': parseFloat(document.getElementById('hardware-efficiency').value),
+    };
+  }
+
+  function getHardwareSettings() {
+    if (!window.hardwareData) return {};
+    const selectedGpuId = hardwareSelect.value;
+    const selectedGpu = window.hardwareData.gpus.find(g => g.id === selectedGpuId);
+    const components = window.hardwareData.components;
+    const gpuNum = parseInt(document.getElementById('gpu-count').value, 10);
+
+    if (!selectedGpu) return {};
+
+    return {
+      'gpu_flop_peak': selectedGpu.flop_peak,
+      'gpu_tdp': selectedGpu.tdp,
+      'gpu_cap': selectedGpu.cap,
+      'gpu_area': selectedGpu.area,
+      'cpu_cap': components.cpu.cap,
+      'cpu_area': components.cpu.area,
+      'dram_cap': components.dram.cap,
+      'dram_area': components.dram.area,
+      'ssd_cap': components.ssd.cap,
+      'ssd_area': components.ssd.area,
+      'hardware-unit-num': gpuNum / 8, // Assuming 8 GPUs per node
+    };
+  }
+
+  function getHardwareSettings() {
+    if (!window.hardwareData) return {};
+    const selectedGpuId = hardwareSelect.value;
+    const selectedGpu = window.hardwareData.gpus.find(g => g.id === selectedGpuId);
+    const components = window.hardwareData.components;
+    const gpuNum = parseInt(document.getElementById('gpu-count').value, 10);
+
+    if (!selectedGpu) return {};
+
+    return {
+      'gpu_flop_peak': selectedGpu.flop_peak,
+      'gpu_tdp': selectedGpu.tdp,
+      'gpu_cap': selectedGpu.cap,
+      'gpu_area': selectedGpu.area,
+      'cpu_cap': components.cpu.cap,
+      'cpu_area': components.cpu.area,
+      'dram_cap': components.dram.cap,
+      'dram_area': components.dram.area,
+      'ssd_cap': components.ssd.cap,
+      'ssd_area': components.ssd.area,
+      'hardware-unit-num': gpuNum / 8, // Assuming 8 GPUs per node
     };
   }
 
@@ -141,17 +205,19 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   function handleSettingsChange() {
     if (!calculator) return;
-    const settings = getSettingsFromForm();
-    calculator.updateSettings(settings);
+    const formSettings = getSettingsFromForm();
+    const hardwareSettings = getHardwareSettings();
+    const allSettings = { ...formSettings, ...hardwareSettings };
+    calculator.updateSettings(allSettings);
     
-    const imageTokens = settings['image-count'] * 255; // rough heuristics
-    const fileTokens = settings['file-size'] * 250;
-    const totalTokens = lastTextTokenCount + imageTokens + fileTokens + settings['system-instructions'];
+    const imageTokens = allSettings['image-count'] * 255; // rough heuristics
+    const fileTokens = allSettings['file-size'] * 250;
+    const totalTokens = lastTextTokenCount + imageTokens + fileTokens + allSettings['system-instructions'];
 
     statusEl.textContent = `Total Tokens: ${Math.round(totalTokens)} (Text: ${lastTextTokenCount})`;
 
-    currentSettings = settings;
-    const linearCo2 = calculator.calculateInferenceCost(totalTokens); // linear cost
+    currentSettings = allSettings;
+    const linearEmissions = calculator.calculateEmissions(totalTokens);
 
     // Quadratic approximation: sum of cumulative token counts for each prompt
     let cumulativeToks = 0;
@@ -162,25 +228,20 @@ document.addEventListener('DOMContentLoaded', () => {
       cumulativeToks += t;
       quadraticToks  += cumulativeToks;
     }
-    const quadraticCo2 = calculator.calculateInferenceCost(quadraticToks + imageTokens + fileTokens + settings['system-instructions'] * promptLis.length);
+    const quadraticEmissions = calculator.calculateEmissions(quadraticToks + imageTokens + fileTokens + allSettings['system-instructions'] * promptLis.length);
 
-    latestLinearCo2 = linearCo2;
-    latestQuadraticCo2 = quadraticCo2;
+    latestLinearCo2 = linearEmissions.total;
+    latestQuadraticCo2 = quadraticEmissions.total;
 
-    co2LinearEl.textContent    = `Total Emissions ≈ ${linearCo2.toFixed(4)} gCO2e`;
-    co2QuadraticEl.textContent = `Total Emissions ≈ ${quadraticCo2.toFixed(4)} gCO2e`;
+    co2LinearEl.textContent    = `Total Emissions ≈ ${linearEmissions.total.toFixed(4)} gCO2e`;
+    co2QuadraticEl.textContent = `Total Emissions ≈ ${quadraticEmissions.total.toFixed(4)} gCO2e`;
+
+    const isLinear = impactSelect.value === 'linear';
+    const displayedEmissions = isLinear ? linearEmissions : quadraticEmissions;
+    co2OperationalEl.textContent = `Operational: ${displayedEmissions.operational.toFixed(4)} gCO2e`;
+    co2EmbodiedEl.textContent = `Embodied: ${displayedEmissions.embodied.toFixed(4)} gCO2e`;
 
     updateImpactView();
-
-    // Recalculate per-prompt token & CO2
-    const prompts = countsEl.children;
-    for (let i = 0; i < prompts.length; i++) {
-      const prompt = prompts[i];
-      const tokenCount = parseInt(prompt.dataset.tokens);
-      const totalTokensPrompt = tokenCount + imageTokens + fileTokens + settings['system-instructions'];
-      const co2GramsPrompt = calculator.calculateInferenceCost(totalTokensPrompt);
-      prompt.textContent = `Prompt ${i + 1}: ${tokenCount} tokens — ${co2GramsPrompt.toFixed(4)} gCO2e`;
-    }
   }
 
   /**
@@ -213,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const carEmissionPerKm = 140;
+    const carEmissionPerKm = 107;
     const ledBulbWatts = 10;
     const smartphoneChargeWh = 5;
 
@@ -275,9 +336,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const messages = response.messages;
 
-      // Read current settings once for prompt calculations
-      const settings = getSettingsFromForm();
-
       // Group messages into user+assistant pairs (prompt-response)
       const pairs = [];
       for (let i = 0; i < messages.length; i += 2) {
@@ -294,14 +352,14 @@ document.addEventListener('DOMContentLoaded', () => {
         conversationTextTokens += tokenCount;
         cumulativeToksPerPrompt += tokenCount;
 
-        const imageTokens = settings['image-count'] * 255;
-        const fileTokens = settings['file-size'] * 250;
+        const imageTokens = currentSettings['image-count'] * 255;
+        const fileTokens = currentSettings['file-size'] * 250;
 
-        const linearTokensPrompt = tokenCount + imageTokens + fileTokens + settings['system-instructions'];
-        const quadraticTokensPrompt = cumulativeToksPerPrompt + imageTokens + fileTokens + settings['system-instructions'];
+        const linearTokensPrompt = tokenCount + imageTokens + fileTokens + currentSettings['system-instructions'];
+        const quadraticTokensPrompt = cumulativeToksPerPrompt + imageTokens + fileTokens + currentSettings['system-instructions'];
 
-        const linearEm = calculator.calculateInferenceCost(linearTokensPrompt);
-        const quadEm  = calculator.calculateInferenceCost(quadraticTokensPrompt);
+        const linearEm = calculator.calculateEmissions(linearTokensPrompt).total;
+        const quadEm  = calculator.calculateEmissions(quadraticTokensPrompt).total;
 
         const li = document.createElement('li');
         li.dataset.tokens    = tokenCount;
@@ -323,9 +381,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Initial load
-  populateRegions();
-  refresh();
-
-  // Event Listeners
-  refreshBtn.addEventListener('click', refresh);
+  (async () => {
+    try {
+      await initializeTokenizer();
+      initializeCalculator();
+      populateRegions();
+      populateHardware();
+      refresh();
+      // Event Listeners
+      refreshBtn.addEventListener('click', refresh);
+    } catch (err) {
+      statusEl.textContent = 'Error: Could not load tokenizer. Please refresh the extension.';
+      console.error('Initialization failed:', err);
+    }
+  })();
 });
